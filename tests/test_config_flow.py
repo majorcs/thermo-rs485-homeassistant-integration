@@ -18,11 +18,13 @@ from custom_components.thermo_rs485.const import (
     CONF_SERIAL_PORT,
     CONF_SLAVE_ID,
     CONF_STOPBITS,
+    CONF_TEMPERATURE_UNIT,
     DEFAULT_BAUDRATE,
     DEFAULT_PORT,
     DOMAIN,
     PROTOCOL_SERIAL,
     PROTOCOL_TCP,
+    TEMPERATURE_UNIT_FAHRENHEIT,
 )
 from custom_components.thermo_rs485.modbus import ThermoModbusError
 
@@ -200,11 +202,12 @@ async def test_options_flow_updates_scan_interval(hass):
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        {CONF_SCAN_INTERVAL: 60},
+        {CONF_SCAN_INTERVAL: 60, CONF_TEMPERATURE_UNIT: TEMPERATURE_UNIT_FAHRENHEIT},
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"] == {CONF_SCAN_INTERVAL: 60}
+    assert result["data"][CONF_SCAN_INTERVAL] == 60
+    assert result["data"][CONF_TEMPERATURE_UNIT] == TEMPERATURE_UNIT_FAHRENHEIT
 
 
 async def test_tcp_config_flow_shows_connection_error(hass):

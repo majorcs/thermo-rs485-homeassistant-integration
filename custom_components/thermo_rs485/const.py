@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, Platform
 
 DOMAIN = "thermo_rs485"
-PLATFORMS: tuple[Platform, ...] = (Platform.SENSOR, Platform.NUMBER)
+PLATFORMS: tuple[Platform, ...] = (Platform.SENSOR, Platform.NUMBER, Platform.SELECT)
 
 CONF_PROTOCOL = "protocol"
 CONF_SCAN_INTERVAL = "scan_interval"
@@ -38,6 +38,23 @@ BAUDRATE_OPTIONS = [1200, 2400, 4800, 9600, 14400, 19200]
 PARITY_OPTIONS = ["N", "E", "O"]
 STOPBITS_OPTIONS = [1, 2]
 DATABITS_OPTIONS = [7, 8]
+
+# Baud rate ↔ register code translation (register 0x0101)
+BAUD_RATE_TO_CODE: dict[int, int] = {
+    1200: 1,
+    2400: 2,
+    4800: 3,
+    9600: 4,
+    14400: 5,
+    19200: 6,
+}
+CODE_TO_BAUD_RATE: dict[int, int] = {v: k for k, v in BAUD_RATE_TO_CODE.items()}
+
+# Temperature unit option for the options flow
+CONF_TEMPERATURE_UNIT = "temperature_unit"
+TEMPERATURE_UNIT_CELSIUS = "celsius"
+TEMPERATURE_UNIT_FAHRENHEIT = "fahrenheit"
+DEFAULT_TEMPERATURE_UNIT = TEMPERATURE_UNIT_CELSIUS
 
 
 def build_unique_id(data: dict[str, object]) -> str:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
@@ -11,9 +12,11 @@ from custom_components.thermo_rs485.const import (
     CONF_PROTOCOL,
     CONF_SCAN_INTERVAL,
     CONF_SLAVE_ID,
+    CONF_TEMPERATURE_UNIT,
     DEFAULT_PORT,
     DOMAIN,
     PROTOCOL_TCP,
+    TEMPERATURE_UNIT_FAHRENHEIT,
 )
 from custom_components.thermo_rs485.register_map import SENSOR_DESCRIPTIONS, decode_temperature, decode_humidity
 
@@ -96,3 +99,62 @@ def test_decode_humidity_is_always_positive():
     assert decode_humidity({0x0000: 486}) == 48.6
     assert decode_humidity({0x0000: 0}) == 0.0
     assert decode_humidity({0x0000: 1000}) == 100.0
+
+
+async def test_temperature_sensor_displays_fahrenheit_when_configured(hass):
+    """Temperature sensor state should be in °F when the temperature_unit option is fahrenheit."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Sensor",
+        data={
+            CONF_PROTOCOL: PROTOCOL_TCP,
+            CONF_HOST: "192.0.2.22",
+            CONF_PORT: DEFAULT_PORT,
+            CONF_SLAVE_ID: 1,
+            CONF_SCAN_INTERVAL: 30,
+        },
+        options={CONF_TEMPERATURE_UNIT: TEMPERATURE_UNIT_FAHRENHEIT},
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.thermo_rs485.modbus.ThermoModbusClient.async_read_blocks",
+        new=AsyncMock(return_value=_sample_registers()),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    temp_state = hass.states.get("sensor.sensor_temperature")
+    assert temp_state is not None
+    assert temp_state.attributes.get("unit_of_measurement") == "°F"
+    # 30 °C → 86 °F
+    assert float(temp_state.state) == pytest.approx(86.0, abs=0.1)
+
+
+async def test_temperature_sensor_defaults_to_celsius(hass):
+    """Temperature sensor state should be in °C when no temperature_unit option is set."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Sensor",
+        data={
+            CONF_PROTOCOL: PROTOCOL_TCP,
+            CONF_HOST: "192.0.2.23",
+            CONF_PORT: DEFAULT_PORT,
+            CONF_SLAVE_ID: 1,
+            CONF_SCAN_INTERVAL: 30,
+        },
+        options={},
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.thermo_rs485.modbus.ThermoModbusClient.async_read_blocks",
+        new=AsyncMock(return_value=_sample_registers()),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    temp_state = hass.states.get("sensor.sensor_temperature")
+    assert temp_state is not None
+    assert temp_state.attributes.get("unit_of_measurement") == "°C"
+    assert temp_state.state == "30.0"

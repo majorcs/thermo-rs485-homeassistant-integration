@@ -21,6 +21,7 @@ from .const import (
     CONF_SERIAL_PORT,
     CONF_SLAVE_ID,
     CONF_STOPBITS,
+    CONF_TEMPERATURE_UNIT,
     DATABITS_OPTIONS,
     DEFAULT_BAUDRATE,
     DEFAULT_DATABITS,
@@ -29,12 +30,15 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SLAVE_ID,
     DEFAULT_STOPBITS,
+    DEFAULT_TEMPERATURE_UNIT,
     DOMAIN,
     PARITY_OPTIONS,
     PROTOCOL_SERIAL,
     PROTOCOL_TCP,
     STOPBITS_OPTIONS,
     SUPPORTED_PROTOCOLS,
+    TEMPERATURE_UNIT_CELSIUS,
+    TEMPERATURE_UNIT_FAHRENHEIT,
     build_entry_title,
     build_unique_id,
 )
@@ -96,6 +100,18 @@ def _databits_selector() -> selector.SelectSelector:
             options=[
                 selector.SelectOptionDict(value=str(db), label=str(db))
                 for db in DATABITS_OPTIONS
+            ],
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
+def _temperature_unit_selector() -> selector.SelectSelector:
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[
+                selector.SelectOptionDict(value=TEMPERATURE_UNIT_CELSIUS, label="Celsius (°C)"),
+                selector.SelectOptionDict(value=TEMPERATURE_UNIT_FAHRENHEIT, label="Fahrenheit (°F)"),
             ],
             mode=selector.SelectSelectorMode.DROPDOWN,
         )
@@ -243,17 +259,19 @@ class ThermoOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        current = self._config_entry.options.get(
+        current_interval = self._config_entry.options.get(
             CONF_SCAN_INTERVAL,
             self._config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
         )
+        current_unit = self._config_entry.options.get(CONF_TEMPERATURE_UNIT, DEFAULT_TEMPERATURE_UNIT)
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_SCAN_INTERVAL, default=current): selector.NumberSelector(
+                    vol.Required(CONF_SCAN_INTERVAL, default=current_interval): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=1, max=3600, mode=selector.NumberSelectorMode.BOX)
-                    )
+                    ),
+                    vol.Required(CONF_TEMPERATURE_UNIT, default=current_unit): _temperature_unit_selector(),
                 }
             ),
         )

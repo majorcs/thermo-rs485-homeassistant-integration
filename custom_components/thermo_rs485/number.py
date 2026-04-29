@@ -32,7 +32,7 @@ def _decode_register(data: dict[int, int], address: int, scale: int, signed: boo
     raw = int(data[address])
     if signed and raw >= 0x8000:
         raw -= 0x10000
-    return round(raw / scale, 1) if scale != 1 else float(raw)
+    return round(raw / scale, 1) if scale != 1 else int(raw)
 
 
 def _encode_register(value: float, scale: int, signed: bool) -> int:
@@ -54,17 +54,6 @@ NUMBER_DESCRIPTIONS: tuple[ThermoNumberDescription, ...] = (
         mode=NumberMode.BOX,
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:identifier",
-    ),
-    ThermoNumberDescription(
-        key="baud_rate_code",
-        name="Baud rate code",
-        register=0x0101,
-        native_min_value=1,
-        native_max_value=6,
-        native_step=1,
-        mode=NumberMode.BOX,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:serial-port",
     ),
     ThermoNumberDescription(
         key="temperature_correction",

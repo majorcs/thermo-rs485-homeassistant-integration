@@ -45,7 +45,8 @@
       "init": {
         "title": "Thermo RS485 options",
         "data": {
-          "scan_interval": "Scan interval (seconds)"
+          "scan_interval": "Scan interval (seconds)",
+          "temperature_unit": "Temperature unit"
         }
       }
     }

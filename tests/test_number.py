@@ -53,15 +53,13 @@ async def test_number_entities_are_created_with_live_values(hass):
         await hass.async_block_till_done()
 
     device_address = hass.states.get("number.sensor_device_address")
-    baud_rate_code = hass.states.get("number.sensor_baud_rate_code")
     temp_correction = hass.states.get("number.sensor_temperature_correction")
     hum_correction = hass.states.get("number.sensor_humidity_correction")
 
     assert device_address is not None
-    assert device_address.state == "1.0"
+    assert device_address.state == "1"
 
-    assert baud_rate_code is not None
-    assert baud_rate_code.state == "4.0"
+    assert hass.states.get("number.sensor_baud_rate_code") is None
 
     assert temp_correction is not None
     assert temp_correction.state == "5.0"
@@ -114,7 +112,7 @@ async def test_number_entity_write_through_coordinator(hass):
     await hass.async_block_till_done()
 
     coordinator.async_write_register.assert_awaited_once_with(0x0100, 5)
-    assert hass.states.get("number.sensor_device_address").state == "5.0"
+    assert hass.states.get("number.sensor_device_address").state == "5"
 
 
 async def test_signed_correction_write_negative_value(hass):
@@ -164,9 +162,9 @@ async def test_signed_correction_write_negative_value(hass):
 
 
 def test_decode_register_unsigned():
-    """Unsigned registers should be decoded without sign extension."""
-    assert _decode_register({0x0100: 5}, 0x0100, 1, signed=False) == 5.0
-    assert _decode_register({0x0101: 4}, 0x0101, 1, signed=False) == 4.0
+    """Unsigned registers should be decoded as integers."""
+    assert _decode_register({0x0100: 5}, 0x0100, 1, signed=False) == 5
+    assert _decode_register({0x0101: 4}, 0x0101, 1, signed=False) == 4
 
 
 def test_decode_register_signed_positive():
