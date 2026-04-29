@@ -40,6 +40,7 @@ class ThermoCoordinatorEntity(CoordinatorEntity[ThermoDataUpdateCoordinator]):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.device_unique_id)},
             name=coordinator.entry.title,
+            manufacturer=None,
             model=_build_model(coordinator.entry.data),
             serial_number=str(int(coordinator.entry.data[CONF_SLAVE_ID])),
         )
