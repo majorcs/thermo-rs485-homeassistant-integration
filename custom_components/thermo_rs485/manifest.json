@@ -1,0 +1,18 @@
+{
+  "domain": "thermo_rs485",
+  "name": "Thermo RS485",
+  "codeowners": [
+    "@majorcs"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/majorcs/thermo-rs485-homeassistant-integration",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/majorcs/thermo-rs485-homeassistant-integration/issues",
+  "loggers": [
+    "pymodbus"
+  ],
+  "requirements": [
+    "pymodbus>=3.8.3,<4.0.0"
+  ],
+  "version": "2026.04.29.1"
+}

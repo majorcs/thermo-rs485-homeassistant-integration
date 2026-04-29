@@ -1,0 +1,221 @@
+"""Modbus transport support for the Thermo RS485 integration."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import logging
+
+from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.core import HomeAssistant
+from pymodbus.client import ModbusSerialClient, ModbusTcpClient
+
+from .const import (
+    CONF_BAUDRATE,
+    CONF_DATABITS,
+    CONF_PARITY,
+    CONF_PROTOCOL,
+    CONF_SERIAL_PORT,
+    CONF_SLAVE_ID,
+    CONF_STOPBITS,
+    DEFAULT_BAUDRATE,
+    DEFAULT_DATABITS,
+    DEFAULT_PARITY,
+    DEFAULT_PORT,
+    DEFAULT_STOPBITS,
+    DEFAULT_TIMEOUT,
+    PROTOCOL_SERIAL,
+    PROTOCOL_TCP,
+)
+from .register_map import RegisterBlock
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class ThermoModbusError(Exception):
+    """Raised when Modbus communication fails."""
+
+
+@dataclass(frozen=True, slots=True)
+class ThermoConnectionParams:
+    """Connection parameters for the Thermo RS485 transport."""
+
+    protocol: str
+    slave_id: int
+    host: str | None = None
+    port: int = DEFAULT_PORT
+    serial_port: str | None = None
+    baudrate: int = DEFAULT_BAUDRATE
+    databits: int = DEFAULT_DATABITS
+    parity: str = DEFAULT_PARITY
+    stopbits: int = DEFAULT_STOPBITS
+    timeout: float = DEFAULT_TIMEOUT
+
+    @classmethod
+    def from_mapping(cls, data: dict[str, object]) -> "ThermoConnectionParams":
+        """Build params from config entry or flow data."""
+        return cls(
+            protocol=str(data[CONF_PROTOCOL]),
+            slave_id=int(data[CONF_SLAVE_ID]),
+            host=str(data[CONF_HOST]) if data.get(CONF_HOST) else None,
+            port=int(data.get(CONF_PORT, DEFAULT_PORT)),
+            serial_port=str(data[CONF_SERIAL_PORT]) if data.get(CONF_SERIAL_PORT) else None,
+            baudrate=int(data.get(CONF_BAUDRATE, DEFAULT_BAUDRATE)),
+            databits=int(data.get(CONF_DATABITS, DEFAULT_DATABITS)),
+            parity=str(data.get(CONF_PARITY, DEFAULT_PARITY)),
+            stopbits=int(data.get(CONF_STOPBITS, DEFAULT_STOPBITS)),
+        )
+
+
+class ThermoModbusClient:
+    """Thin wrapper around pymodbus clients for the Thermo RS485 sensor."""
+
+    def __init__(self, hass: HomeAssistant, params: ThermoConnectionParams) -> None:
+        self._hass = hass
+        self._params = params
+        self._client: ModbusTcpClient | ModbusSerialClient | None = None
+
+    async def async_validate_connection(self) -> None:
+        """Validate connectivity by reading the measurement registers."""
+        await self.async_read_blocks((RegisterBlock(start=0x0000, count=2),))
+
+    async def async_read_blocks(self, blocks: tuple[RegisterBlock, ...]) -> dict[int, int]:
+        """Read one or more register blocks."""
+        return await self._hass.async_add_executor_job(self._read_blocks_sync, blocks)
+
+    async def async_write_registers(self, address: int, values: list[int]) -> None:
+        """Write one or more holding registers."""
+        await self._hass.async_add_executor_job(self._write_registers_sync, address, values)
+
+    async def async_close(self) -> None:
+        """Close the client connection."""
+        await self._hass.async_add_executor_job(self._close_sync)
+
+    def _get_client(self) -> ModbusTcpClient | ModbusSerialClient:
+        if self._client is not None:
+            return self._client
+
+        if self._params.protocol == PROTOCOL_TCP:
+            self._client = ModbusTcpClient(
+                host=self._params.host,
+                port=self._params.port,
+                timeout=self._params.timeout,
+            )
+            return self._client
+
+        if self._params.protocol == PROTOCOL_SERIAL:
+            self._client = ModbusSerialClient(
+                port=self._params.serial_port,
+                baudrate=self._params.baudrate,
+                bytesize=self._params.databits,
+                parity=self._params.parity,
+                stopbits=self._params.stopbits,
+                timeout=self._params.timeout,
+            )
+            return self._client
+
+        raise ThermoModbusError(f"Unsupported protocol: {self._params.protocol}")
+
+    def _ensure_connected(self) -> ModbusTcpClient | ModbusSerialClient:
+        client = self._get_client()
+        connected = client.connect()
+        if connected is False:
+            self._close_sync()
+            raise ThermoModbusError("Unable to connect to the Thermo RS485 device")
+        return client
+
+    def _read_blocks_sync(self, blocks: tuple[RegisterBlock, ...]) -> dict[int, int]:
+        client = self._ensure_connected()
+        values: dict[int, int] = {}
+
+        try:
+            for block in blocks:
+                result = self._read_registers(client, block.start, block.count)
+                if result.isError():
+                    raise ThermoModbusError(
+                        f"Read failed for address {block.start:#06x} count {block.count}: {result!s}"
+                    )
+                for index, register in enumerate(result.registers):
+                    values[block.start + index] = int(register)
+        except Exception as err:
+            self._close_sync()
+            if isinstance(err, ThermoModbusError):
+                raise
+            raise ThermoModbusError(str(err)) from err
+
+        return values
+
+    def _read_registers(
+        self,
+        client: ModbusTcpClient | ModbusSerialClient,
+        address: int,
+        count: int,
+    ):
+        try:
+            return client.read_holding_registers(
+                address=address,
+                count=count,
+                device_id=self._params.slave_id,
+            )
+        except TypeError:
+            try:
+                return client.read_holding_registers(
+                    address=address,
+                    count=count,
+                    slave=self._params.slave_id,
+                )
+            except TypeError:
+                return client.read_holding_registers(
+                    address=address,
+                    count=count,
+                    unit=self._params.slave_id,
+                )
+
+    def _write_registers_sync(self, address: int, values: list[int]) -> None:
+        client = self._ensure_connected()
+
+        try:
+            result = self._write_registers(client, address, values)
+            if result.isError():
+                raise ThermoModbusError(
+                    f"Write failed for address {address:#06x} values {values}: {result!s}"
+                )
+        except Exception as err:
+            self._close_sync()
+            if isinstance(err, ThermoModbusError):
+                raise
+            raise ThermoModbusError(str(err)) from err
+
+    def _write_registers(
+        self,
+        client: ModbusTcpClient | ModbusSerialClient,
+        address: int,
+        values: list[int],
+    ):
+        try:
+            return client.write_registers(
+                address=address,
+                values=values,
+                device_id=self._params.slave_id,
+            )
+        except TypeError:
+            try:
+                return client.write_registers(
+                    address=address,
+                    values=values,
+                    slave=self._params.slave_id,
+                )
+            except TypeError:
+                return client.write_registers(
+                    address=address,
+                    values=values,
+                    unit=self._params.slave_id,
+                )
+
+    def _close_sync(self) -> None:
+        if self._client is None:
+            return
+        try:
+            self._client.close()
+        finally:
+            self._client = None
+            _LOGGER.debug("Closed Thermo RS485 Modbus client")

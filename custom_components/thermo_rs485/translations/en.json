@@ -1,0 +1,53 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thermo RS485",
+        "description": "Select the Modbus transport protocol.",
+        "data": {
+          "protocol": "Protocol"
+        }
+      },
+      "tcp": {
+        "title": "Modbus TCP",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "slave_id": "Slave ID",
+          "scan_interval": "Scan interval (seconds)",
+          "name": "Name (optional)"
+        }
+      },
+      "serial": {
+        "title": "Modbus RTU (Serial)",
+        "data": {
+          "serial_port": "Serial port",
+          "baudrate": "Baud rate",
+          "databits": "Data bits",
+          "parity": "Parity",
+          "stopbits": "Stop bits",
+          "slave_id": "Slave ID",
+          "scan_interval": "Scan interval (seconds)",
+          "name": "Name (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the device. Check the address, port, and slave ID.",
+      "invalid_protocol": "Invalid protocol selected."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Thermo RS485 options",
+        "data": {
+          "scan_interval": "Scan interval (seconds)"
+        }
+      }
+    }
+  }
+}

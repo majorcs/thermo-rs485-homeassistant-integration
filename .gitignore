@@ -1,0 +1,35 @@
+# Local docs (AI/architecture notes — never committed)
+docs/
+
+# Home Assistant manual test environment
+.manual-homeassistant/
+.manual-homeassistant-venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
