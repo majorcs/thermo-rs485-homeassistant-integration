@@ -11,10 +11,13 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.thermo_rs485.const import (
     CONF_PROTOCOL,
     CONF_SCAN_INTERVAL,
+    CONF_SERIAL_PORT,
     CONF_SLAVE_ID,
     CONF_TEMPERATURE_UNIT,
     DEFAULT_PORT,
     DOMAIN,
+    MODEL,
+    PROTOCOL_SERIAL,
     PROTOCOL_TCP,
     TEMPERATURE_UNIT_FAHRENHEIT,
 )
@@ -158,3 +161,73 @@ async def test_temperature_sensor_defaults_to_celsius(hass):
     assert temp_state is not None
     assert temp_state.attributes.get("unit_of_measurement") == "°C"
     assert temp_state.state == "30.0"
+
+
+async def test_device_info_tcp_shows_protocol_and_host(hass):
+    """DeviceInfo model should include 'TCP' and the host for TCP entries."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="My Sensor",
+        data={
+            CONF_PROTOCOL: PROTOCOL_TCP,
+            CONF_HOST: "192.0.2.30",
+            CONF_PORT: DEFAULT_PORT,
+            CONF_SLAVE_ID: 3,
+            CONF_SCAN_INTERVAL: 30,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.thermo_rs485.modbus.ThermoModbusClient.async_read_blocks",
+        new=AsyncMock(return_value=_sample_registers()),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    from homeassistant.helpers import device_registry as dr
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_device(
+        identifiers={(DOMAIN, f"tcp:192.0.2.30:{DEFAULT_PORT}:3")}
+    )
+    assert device is not None
+    assert "TCP" in device.model
+    assert "192.0.2.30" in device.model
+    assert device.serial_number == "3"
+
+
+async def test_device_info_rtu_shows_protocol_and_port_name(hass):
+    """DeviceInfo model should include 'RTU' and the port name (not full path) for serial entries."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="My RTU Sensor",
+        data={
+            CONF_PROTOCOL: PROTOCOL_SERIAL,
+            CONF_SERIAL_PORT: "/dev/ttyUSB0",
+            CONF_SLAVE_ID: 5,
+            CONF_SCAN_INTERVAL: 30,
+            "baudrate": 9600,
+            "databits": 8,
+            "parity": "N",
+            "stopbits": 1,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.thermo_rs485.modbus.ThermoModbusClient.async_read_blocks",
+        new=AsyncMock(return_value=_sample_registers()),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    from homeassistant.helpers import device_registry as dr
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_device(
+        identifiers={(DOMAIN, "serial:/dev/ttyUSB0:5")}
+    )
+    assert device is not None
+    assert "RTU" in device.model
+    assert "ttyUSB0" in device.model
+    assert "/dev" not in device.model
+    assert device.serial_number == "5"
